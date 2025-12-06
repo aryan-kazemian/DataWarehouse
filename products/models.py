@@ -2,14 +2,16 @@ from django.db import models
 from django.utils.text import slugify
 from mptt.models import MPTTModel, TreeForeignKey
 from django.core.exceptions import ValidationError
+from suppliers.models import Supplier
 
 
 class Brand(models.Model):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, null=True)
 
     class Meta:
-        db_table = "brand"
+        db_table = "Brand"
         ordering = ["name"]
         verbose_name = "Brand"
         verbose_name_plural = "Brands"
@@ -30,7 +32,6 @@ class Brand(models.Model):
     def __str__(self):
         return self.name
 
-
 class Category(MPTTModel):
     name = models.CharField(max_length=255, unique=True)
     parent = TreeForeignKey(
@@ -46,19 +47,23 @@ class Category(MPTTModel):
         order_insertion_by = ["name"]
 
     class Meta:
-        db_table = "category"
+        db_table = "Category"
         verbose_name = "Category"
         verbose_name_plural = "Categories"
 
-    def save(self, *args, **kwargs):
+    def clean(self):
         level = 1
         parent = self.parent
+
         while parent:
             level += 1
             if level > 3:
-                raise ValidationError("Category hierarchy cannot exceed 3 levels.")
+                raise ValidationError({
+                    "parent": "Category hierarchy cannot exceed 3 levels."
+                })
             parent = parent.parent
 
+    def save(self, *args, **kwargs):
         if not self.slug or (self.pk and Category.objects.get(pk=self.pk).name != self.name):
             base_slug = slugify(self.name)
             slug = base_slug
@@ -69,15 +74,6 @@ class Category(MPTTModel):
             self.slug = slug
 
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        full_path = [self.name]
-        k = self.parent
-        while k is not None:
-            full_path.append(k.name)
-            k = k.parent
-        return " -> ".join(full_path[::-1])
-
 
 class Product(models.Model):
     name = models.CharField(max_length=255)
@@ -110,14 +106,13 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "product"
+        db_table = "Product"
         ordering = ["-created_at"]
         verbose_name = "Product"
         verbose_name_plural = "Products"
 
     def __str__(self):
         return self.name
-
 
 class Variant(models.Model):
     product = models.ForeignKey(
@@ -130,9 +125,11 @@ class Variant(models.Model):
     size = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        db_table = "Variant"
 
     class Meta:
-        db_table = "variant"
+        db_table = "Variant"
         ordering = ["-created_at"]
         verbose_name = "Variant"
         verbose_name_plural = "Variants"

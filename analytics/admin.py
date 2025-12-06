@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import DimDate, DimProductBase, DimVariantOrder, DimUser, FactSales
+from .models import DimDate, DimProductBase, DimVariantOrder, DimUser, FactSales, FactAnalytics
 
 
 # -------------------------------
@@ -25,7 +25,7 @@ class DimDateAdmin(EditableAdmin):
 
 @admin.register(DimProductBase)
 class DimProductBaseAdmin(EditableAdmin):
-    list_display = ('product_id', 'name', 'brand', 'price', 'is_available', 'created_at', 'updated_at')
+    list_display = ('product_id', 'name', 'brand', 'price', 'is_available', 'created_at', 'updated_at', 'supplier')
     search_fields = ('name', 'brand')
     list_filter = ('is_available', 'is_exciting', 'free_shipping', 'has_gift', 'is_budget_friendly')
 
@@ -47,4 +47,20 @@ class DimUserAdmin(EditableAdmin):
 class FactSalesAdmin(EditableAdmin):
     list_display = ('id', 'date', 'user', 'total_price', 'total_price_after_discount')
     search_fields = ('user__username', 'date__full_date')
-    filter_horizontal = ('variants',)  # optional for M2M display
+    filter_horizontal = ('variants',)
+
+@admin.register(FactAnalytics)
+class FactAnalyticsAdmin(admin.ModelAdmin):
+    list_display = (
+        'date', 
+        'total_order_quantity', 
+        'initial_order_quantity',
+        'process_order_quantity',
+        'sent_order_quantity', 
+        'done_order_quantity', 
+        'cancel_order_quantity', 
+        'rejected_order_quantity'
+    )
+    list_filter = ('date',)
+    search_fields = ('date__full_date',)
+    ordering = ('-date',)

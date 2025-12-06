@@ -9,7 +9,7 @@ class AgeRange(models.Model):
     slug = models.SlugField(max_length=255, unique=True, blank=True)
 
     class Meta:
-        db_table = "age_range"
+        db_table = "AgeRange"
         verbose_name = "Age Range"
         verbose_name_plural = "Age Ranges"
         ordering = ["min_age"]
@@ -48,7 +48,7 @@ class User(AbstractUser):
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
 
     class Meta:
-        db_table = "user"
+        db_table = "User"
         verbose_name = "User"
         verbose_name_plural = "Users"
 
