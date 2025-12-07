@@ -4,6 +4,7 @@ from accounts.models import AgeRange, User
 from products.models import Brand, Category, Product, Variant
 from orders.models import Order, OrderItem
 from orders.constants import ORDER_STATUS_CHOICES
+from suppliers.models import Supplier, PurchaseInvoice, PurchaseItem
 from faker import Faker
 import random
 from datetime import timedelta
@@ -16,7 +17,7 @@ def random_date_last_year():
     return today - timedelta(days=days_back)
 
 class Command(BaseCommand):
-    help = "Creates test data for the project with detailed logging"
+    help = "Creates full test data including suppliers, invoices, and orders with realistic statuses"
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.WARNING("Starting test data generation..."))
@@ -56,6 +57,21 @@ class Command(BaseCommand):
             brand, _ = Brand.objects.get_or_create(name=fake.unique.company())
             brands.append(brand)
             self.stdout.write(f"Created Brand: {brand.name}")
+
+        # ---- SUPPLIERS ----
+        suppliers = []
+        for i in range(20):
+            supplier_name = fake.unique.company()
+            supplier, _ = Supplier.objects.get_or_create(name=supplier_name)
+            suppliers.append(supplier)
+            self.stdout.write(f"Created Supplier: {supplier.name}")
+
+        # ---- ASSIGN BRANDS TO SUPPLIERS ----
+        for brand in brands:
+            supplier = random.choice(suppliers)
+            brand.supplier = supplier
+            brand.save()
+            self.stdout.write(f"Assigned Brand: {brand.name} to Supplier: {supplier.name}")
 
         # ---- CATEGORIES ----
         parents = []
@@ -106,20 +122,41 @@ class Command(BaseCommand):
                 variants.append(variant)
                 self.stdout.write(f"Created Variant: {variant.sku} | Product: {product.name} | Color: {variant.color} | Size: {variant.size}")
 
+        # ---- PURCHASE INVOICES (Split variants per supplier by brand) ----
+        self.stdout.write(self.style.WARNING("Creating PurchaseInvoices for suppliers with only their brands' variants..."))
+        for supplier in suppliers:
+            invoice = PurchaseInvoice.objects.create(
+                title=f"Invoice for {supplier.name}",
+                Supplier=supplier,
+                status="done",  # So stock is available
+                delivery_date=random_date_last_year().date(),
+                delivery_time=random_date_last_year().time()
+            )
+            # Only variants of products whose brand belongs to this supplier
+            supplier_variants = [v for v in variants if v.product.brand and v.product.brand.supplier == supplier]
+            for variant in supplier_variants:
+                quantity = random.randint(50, 100)
+                PurchaseItem.objects.create(
+                    invoice=invoice,
+                    product_variant=variant,
+                    quantity=quantity
+                )
+            invoice.update_total_price()
+            self.stdout.write(f"Created PurchaseInvoice #{invoice.pk} for Supplier {supplier.name} with {len(supplier_variants)} variants")
+
         # ---- ORDERS ----
         orders = []
         for i in range(5000):
             user = random.choice(users)
-            status = random.choice([s[0] for s in ORDER_STATUS_CHOICES])
             created_at = random_date_last_year()
             order = Order.objects.create(
                 user=user,
-                status=status,
+                status="initial",  # All orders start as initial
                 created_at=created_at,
                 updated_at=created_at
             )
             orders.append(order)
-            self.stdout.write(f"Created Order: {order.id} | User: {user.username} | Status: {status} | Date: {created_at.date()}")
+            self.stdout.write(f"Created Order: {order.id} | User: {user.username} | Status: initial | Date: {created_at.date()}")
 
             # ---- ORDER ITEMS ----
             order_items_count = random.randint(1, 5)
@@ -137,4 +174,20 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(f"  Created OrderItem: {oi.id} | Order: {order.id} | Variant: {variant.sku} | Qty: {quantity} | Discount: {discount}%")
 
-        self.stdout.write(self.style.SUCCESS("Test data generation completed!"))
+        # ---- UPDATE ORDER STATUSES ----
+        self.stdout.write(self.style.WARNING("Updating order statuses..."))
+        random.shuffle(orders)
+        total_orders = len(orders)
+        done_count = int(total_orders * 0.9)  # 90% done
+        cancel_count = total_orders - done_count  # remaining 10% cancel/rejected
+
+        # Set 90% to done
+        for order in orders[:done_count]:
+            order.status = "done"
+            order.save(update_fields=["status"])
+        # Set remaining 10% to either cancel or rejected
+        for order in orders[done_count:]:
+            order.status = random.choice(["cancel", "rejected"])
+            order.save(update_fields=["status"])
+
+        self.stdout.write(self.style.SUCCESS("All test data generation completed!"))

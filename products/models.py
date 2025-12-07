@@ -136,3 +136,25 @@ class Variant(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.sku}"
+
+class VariantInvoiceQuantity(models.Model):
+    variant = models.ForeignKey(
+        "Variant", 
+        on_delete=models.CASCADE, 
+        related_name="variant_invoice_quantities"
+    )
+    invoice = models.ForeignKey(
+        "suppliers.PurchaseInvoice",
+        on_delete=models.CASCADE,
+        related_name="variant_quantities"
+    )
+    quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = "VariantInvoiceQuantity"
+        verbose_name = "Variant Invoice Quantity"
+        verbose_name_plural = "Variant Invoice Quantities"
+        unique_together = ("variant", "invoice")
+
+    def __str__(self):
+        return f"{self.variant.sku} x {self.quantity} for Invoice #{self.invoice.id}"

@@ -1,8 +1,7 @@
-from django.db.models import Sum, F, Count
-from .models import FactSales, DimVariantOrder
 from collections import defaultdict
 from django.db.models import Sum, F, Count
 from .models import FactSales, DimVariantOrder, DimProductBase
+
 
 def get_most_sold_products(start=None, end=None, queryset=None):
     if queryset is None:

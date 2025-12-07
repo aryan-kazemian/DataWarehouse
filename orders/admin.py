@@ -1,67 +1,42 @@
 from django.contrib import admin
-from .models import Order, OrderItem
+from .models import Order, OrderItem, OrderItemVariantInvoiceQuantity
 
+@admin.register(OrderItemVariantInvoiceQuantity)
+class OrderItemVariantInvoiceQuantityAdmin(admin.ModelAdmin):
+    list_display = ("order_item", "variant_invoice_quantity", "deducted_quantity")
+    autocomplete_fields = ("order_item", "variant_invoice_quantity")
 
-# --------------------------------------
-# Inline for OrderItem (optimized)
-# --------------------------------------
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    per_page = 20  # prevent loading hundreds of rows at once
-    readonly_fields = (
-        "unit_price",
-        "total_price",
-        "total_after_discount",
-        "created_at",
-        "updated_at",
-    )
-    fields = (
-        "variant",
-        "quantity",
-        "unit_price",
-        "discount_percent",
-        "total_price",
-        "total_after_discount",
-        "created_at",
-        "updated_at",
-    )
+    readonly_fields = ("unit_price", "total_price", "total_after_discount", "created_at", "updated_at")
+    fields = ("variant", "quantity", "unit_price", "discount_percent", "total_price", "total_after_discount", "created_at", "updated_at")
     show_change_link = True
+    autocomplete_fields = ("variant",)
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("variant", "variant__product")
 
-# --------------------------------------
-# Order Admin
-# --------------------------------------
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "user",
-        "status",
-        "created_at",
-        "updated_at",
-        "total_amount_display",
-        "total_after_discount_display",
-    )
+    list_display = ("id", "user_display", "status", "created_at", "updated_at", "total_amount_display", "total_after_discount_display")
     list_filter = ("status", "created_at", "updated_at")
     search_fields = ("id", "user__username", "user__email")
-    readonly_fields = (
-        "total_amount_display",
-        "total_after_discount_display",
-        "created_at",
-        "updated_at",
-    )
+    readonly_fields = ("total_amount_display", "total_after_discount_display", "created_at", "updated_at")
     inlines = [OrderItemInline]
     ordering = ("-created_at",)
+    autocomplete_fields = ("user",)
 
-    # 🔥🔥 CRITICAL FIX:
-    # Disable analytics syncing when saving from admin
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("user").prefetch_related("items__variant__product")
+
     def save_model(self, request, obj, form, change):
-        obj.skip_analytics = True  # This flag stops analytics logic in Order.save()
+        obj.skip_analytics = True
         super().save_model(request, obj, form, change)
 
     def save_formset(self, request, form, formset, change):
-        # Disable analytics sync on inline OrderItem saves
         instances = formset.save(commit=False)
         for inst in instances:
             inst.order.skip_analytics = True
@@ -76,37 +51,26 @@ class OrderAdmin(admin.ModelAdmin):
         return obj.total_after_discount
     total_after_discount_display.short_description = "Total After Discount"
 
+    def user_display(self, obj):
+        return obj.user.username if obj.user else "-"
+    user_display.admin_order_field = "user"
+    user_display.short_description = "User"
 
-# --------------------------------------
-# OrderItem Admin
-# --------------------------------------
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "order",
-        "variant_display",
-        "quantity",
-        "unit_price",
-        "discount_percent",
-        "total_price",
-        "total_after_discount",
-        "created_at",
-        "updated_at",
-    )
+    list_display = ("id", "order_display", "variant_display", "quantity", "unit_price", "discount_percent", "total_price", "total_after_discount", "created_at", "updated_at")
     list_filter = ("order__status", "created_at", "updated_at")
     search_fields = ("variant__product__name", "order__id")
-    readonly_fields = (
-        "unit_price",
-        "total_price",
-        "total_after_discount",
-        "created_at",
-        "updated_at",
-    )
+    readonly_fields = ("unit_price", "total_price", "total_after_discount", "created_at", "updated_at")
     ordering = ("-created_at",)
+    autocomplete_fields = ("variant", "order")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("order", "order__user", "variant", "variant__product")
 
     def save_model(self, request, obj, form, change):
-        obj.order.skip_analytics = True  # disable analytics sync
+        obj.order.skip_analytics = True
         super().save_model(request, obj, form, change)
 
     def variant_display(self, obj):
@@ -114,3 +78,8 @@ class OrderItemAdmin(admin.ModelAdmin):
             return f"{obj.variant.product.name} ({obj.variant.color}, {obj.variant.size})"
         return "-"
     variant_display.short_description = "Product / Variant"
+
+    def order_display(self, obj):
+        return f"#{obj.order.id}" if obj.order else "-"
+    order_display.admin_order_field = "order"
+    order_display.short_description = "Order"

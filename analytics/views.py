@@ -13,21 +13,13 @@ from .serializers import (
     FactSalesVariantSerializer,
     FactAnalyticsSerializer,
     MostSoldProductSerializer,
-    TopUserSerializer
+    TopUserSerializer,
+    TopSupplierSerializer
 )
-from .filters import FactAnalyticsFilter, MostSoldProductsFilter, OrdersByStatusFilter, TopUsersFilter
+from .filters import FactAnalyticsFilter, MostSoldProductsFilter, OrdersByStatusFilter, TopUsersFilter, TopSuppliersFilter
 from .sync_orders_analytics import sync_orders_analytics, verify_fact_sales_totals, simple_analysis
-from .services import get_orders_by_status, get_top_users
-from collections import defaultdict
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
-from .services import get_top_suppliers
-from .serializers import TopSupplierSerializer
-from .filters import TopSuppliersFilter
-from .models import FactSales
+from .services import get_orders_by_status, get_top_users, get_top_suppliers
+
 
 
 
